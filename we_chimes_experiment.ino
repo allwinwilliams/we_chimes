@@ -19,7 +19,7 @@ uint8_t ledArray[3] = {1, 2, 3}; // three led channels
 
 const boolean invert = true; // set true if common anode, false if common cathode
 
-uint8_t color = 0, hue = 255, save_hue = 255;          // a value from 0 to 255 representing the hue
+uint8_t color = 0, hue = 200, save_hue = 200;          // a value from 0 to 255 representing the hue
 uint32_t R, G, B ;           // the Red Green and Blue color components
 uint8_t brightness = 255;  // 255 is maximum brightness, but can be changed.  Might need 256 for common anode to fully turn off.
 
@@ -114,12 +114,20 @@ void setColor(uint32_t r, uint32_t g, uint32_t b){
   R = r;
   G = g;
   B = b;
+  
   if(R > 255)
     R = 255;
   if(G > 255)
     G = 255;
   if(B > 255)
     B = 255;
+
+  if(R < 0)
+    R = 0;
+  if(G < 0)
+    G = 0;
+  if(B < 0)
+    B = 0;
 }
 
 void setBrightness(uint32_t bright){
@@ -146,7 +154,9 @@ void writeRGB(uint32_t r, uint32_t g, uint32_t b){
 void saveHue(){
   save_hue = hue;
  }
-
+uint8_t newHue(uint8_t h){
+  return (h + 100) % 255;
+}
 void collision(){
   Serial.println("------ COLLISION -----------");
   Serial.print("Vibration: ");
@@ -157,9 +167,10 @@ void collision(){
   writeRGB(0, 0, 0);
   delay(200);
 
+  hue = newHue(hue);
+  saveHue();
   hueToRGB(hue, brightness);
   writeRGB();
-  saveHue();
 }
 
 bool threshold(uint32_t v1, uint32_t v2){
@@ -177,8 +188,7 @@ bool accelerate_enough(){
     Serial.println("ACCELERATION:: ");
       
     Serial.println(acceleration);
-    Serial.println("diff:: ");
-    Serial.println(acceleration - prev_acceleration);
+
 
     return true;
   }
@@ -215,24 +225,28 @@ void controlLED(){
 
   if(accelerate_enough()){
 //    writeRGB(R + LEDChange(x), G + LEDChange(y), B + LEDChange(z));
-    uint32_t hue_diff = int(sqrt(abs(acceleration - prev_acceleration)) * 2);
+    uint32_t hue_diff = int(sqrt(abs(acceleration - prev_acceleration)));
     uint32_t inc = 1;
+    Serial.println("diff:: ");
+    Serial.println(hue_diff);
     if(acceleration - prev_acceleration < 0){
         inc = -1;
     }
     for(int i = hue; hue_diff != 0; hue_diff = hue_diff - 1){
-      hueToRGB(hue + inc, brightness + inc);
+      if(hue + inc > 255)
+        break;
+      hueToRGB(hue + inc, brightness);
       writeRGB();
-      delay(8);
+      delay(10);
     }
   } 
 
-  if(pir_reading - prev_pir_reading > 25){
+  if(pir_reading - prev_pir_reading > 30){
     Serial.println(">>>>>> motion detected <<<<<< ");
     Serial.print("PIR: ");  
     Serial.print(pir_reading);
     Serial.println();
-    uint32_t bright_diff = int(sqrt(abs(pir_reading - prev_pir_reading)) * 10);
+    uint32_t bright_diff = int(sqrt(abs(pir_reading - prev_pir_reading)) * 8);
     Serial.print("bright_diff: ");  
     Serial.print(bright_diff);
     uint32_t max_color = max(R, G, B);
@@ -240,12 +254,9 @@ void controlLED(){
     Serial.println();
     
     for(int i = brightness; bright_diff != 0; bright_diff = bright_diff - 1){
-      hueToRGB(hue, brightness + 1);
-      writeRGB(R + 1, B + 1, G + 1);
-      Serial.println(R);
-      Serial.println(G);
-      Serial.println(B);
-      Serial.println("----------------");
+//      hueToRGB(hue, brightness - 1);
+      setColor(R - 1, B - 1, G - 1);
+      writeRGB();
       delay(10);
     }
   }
